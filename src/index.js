@@ -1,41 +1,11 @@
-import { clone, curry } from 'ramda';
-import { compile } from 'fundefstr';
-import slugify from 'slugify';
+import { DEFAULT_LIMIT } from '@rugo-vn/common';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import { clone } from 'ramda';
 
-import { COLLECTION, FS_SCHEMA } from './constants.js';
-import validate from './validate.js';
+export const name = 'model';
 
-const generateDefault = compile({
-  slugify ([value, ...params]) {
-    return [slugify(value || '', { strict: true, lower: true, locale: 'vi' }), -1, ...params];
-  },
-
-  counter ([value, counter, ...params]) {
-    return [value, counter + 1, ...params];
-  },
-
-  async unique ([value, counter, collection, field], next, back) {
-    const query = {};
-    query[field] = value + (counter === 0 ? '' : `-${counter}`);
-
-    const { total } = await doList(collection, query);
-
-    if (total === 0) { next([query[field]]); } else { back([value, counter, collection, field]); }
-  },
-
-  async unislug ([value, collection, field]) {
-    return await generateDefault('slugify,counter,unique:value,collection,field', { value, collection, field });
-  }
-});
-
-/**
- * Extract specific name from object.
- *
- * @param {object} doc Origin object.
- * @param {Array.<string>} controlNames List of name needed.
- * @returns {object} contain `controls` property and `doc` property.
- */
-const extractControls = (doc, controlNames) => {
+const extractSchema = (doc, controlNames) => {
   const controls = {};
   const newDoc = {};
 
@@ -48,197 +18,212 @@ const extractControls = (doc, controlNames) => {
     newDoc[key] = doc[key];
   }
 
-  return {
-    controls,
-    doc: newDoc
-  };
+  return [controls, newDoc];
 };
 
-/**
- * List documents.
- *
- * @async
- * @param {Collection} collection Collection want to handle.
- * @param {object} query Match exact query object. May be contain controls with $ prefix: $limit, $sort, $skip
- * @returns {object} List result, contains: total (total of query result), skip (no skip documents), limit (no limit documents), data (list document).
- */
-const doList = async (collection, query) => {
-  const { doc: doQuery, controls } = extractControls(query, [
-    '$sort',
-    '$limit',
-    '$skip'
-  ]);
+export const actions = {
+  async create (ctx) {
+    const { params, meta } = ctx;
+    const { doc } = params || {};
+    const { driver, schema } = meta;
 
-  controls.$limit = parseInt(controls.$limit);
-  if (isNaN(controls.$limit)) { controls.$limit = 10; }
+    const validate = this.ajv.compile(schema);
+    const rel = validate(doc);
 
-  for (const name in controls.$sort) {
-    controls.$sort[name] = parseInt(controls.$sort[name]);
-    if (isNaN(controls.$sort[name])) { delete controls.$sort[name]; }
-  }
-
-  controls.$skip = parseInt(controls.$skip);
-  if (isNaN(controls.$skip)) { controls.$skip = 0; }
-
-  return await collection.list(doQuery, controls);
-};
-
-/**
- * Get a document by id.
- *
- * @async
- * @param {Collection} collection Collection want to handle.
- * @param {*} id Id of document need to find.
- * @returns {Document} Document needed.
- */
-const doGet = async (collection, id) => {
-  return await collection.get(id);
-};
-
-/**
- * Create a new document
- *
- * @async
- * @param {Collection} collection Collection want to handle. Required.
- * @param {Schema} _schema Shape of data. Required.
- * @param {Document} doc A document to be created. Required.
- * @returns {Document} A created document.
- */
-const doCreate = async (collection, _schema, doc) => {
-  const schema = clone(_schema);
-
-  // default generator
-  for (const key in schema) {
-    if (typeof schema[key] === 'object' && schema[key] && schema[key].default) {
-      const rel = /^%(.*?)%$/.exec(schema[key].default);
-
-      if (!rel) { continue; }
-
-      schema[key].default = (await generateDefault(`${rel[1]},__collection,__field`, {
-        ...doc,
-        __collection: collection,
-        __field: key
-      }))[0];
+    if (!rel) {
+      return {
+        status: 'error',
+        data: validate.errors.map(item => ({
+          type: `validate.${item.keyword}`,
+          path: item.instancePath,
+          message: item.message
+        }))
+      };
     }
-  }
 
-  // validate
-  const insertedDoc = validate(schema, doc);
-
-  // addition info
-  const now = (new Date()).toISOString();
-  insertedDoc.createdAt = now;
-  insertedDoc.updatedAt = now;
-  insertedDoc.version = 1;
-
-  // exec
-  return await collection.create(insertedDoc);
-};
-
-/**
- * Patch documents.
- *
- * @async
- * @param {Collection} collection Collection want to handle. Required.
- * @param {Schema} schema Shape of data. Required.
- * @param {string} id Id of document need to find.
- * @param {object} doc Data to patch, maybe contain controls with $ prefix: $inc.
- * @returns {number} No of changed documents.
- */
-const doPatch = async (collection, schema, id, doc) => {
-  // extract
-  const { doc: extractedDoc, controls } = extractControls(doc, ['$inc']);
-
-  // validate
-  const patchedDoc = validate(schema, extractedDoc, true);
-
-  // unset field
-  const unset = {};
-  for (const fieldName in patchedDoc) {
-    if (patchedDoc[fieldName] !== null) { continue; }
-
-    unset[fieldName] = 1;
-    delete patchedDoc[fieldName];
-  }
-  if (Object.keys(unset).length) { controls.$unset = unset; }
-
-  // addition info
-  const now = (new Date()).toISOString();
-  patchedDoc.updatedAt = now;
-  controls.$inc = controls.$inc || {};
-  controls.$inc.version = 1;
-  controls.$set = patchedDoc;
-
-  // query trigger
-  const query = { _id: collection.id(id) };
-  for (const [fieldName, fieldSchema] of Object.entries(schema)) {
-    // $inc control
-    const incAmount = controls.$inc[fieldName];
-    if (incAmount) {
-      // min trigger
-      if (incAmount < 0 && fieldSchema.min !== undefined) {
-        query[fieldName] = { $gte: fieldSchema.min - incAmount };
-      }
-
-      // max trigger
-      if (incAmount > 0 && fieldSchema.max !== undefined) {
-        query[fieldName] = { $lte: fieldSchema.max - incAmount };
-      }
+    const newDoc = await ctx.call(`${driver}.create`, { doc });
+    if (!newDoc) {
+      return {
+        status: 'error',
+        data: [{ type: 'general', message: 'not create a new one' }]
+      };
     }
-  }
 
-  return await collection.patch(query, controls);
-};
+    return {
+      status: 'success',
+      data: newDoc
+    };
+  },
 
-/**
- * Remove documents
- *
- * @async
- * @param {Collection} collection Collection want to handle. Required.
- * @param {string} id Id of document need to find.
- * @returns {number} No removed document.
- */
-const doRemove = async (collection, id) => {
-  return await collection.remove({ _id: collection.id(id) });
-};
+  async find (ctx) {
+    const { meta } = ctx;
+    const { driver } = meta;
+    const params = ctx.params || {};
 
-/**
- * Create a model with schema validation and transformation.
- *
- * @async
- * @param {Driver} driver Driver for handle.
- * @param {Schema} rawSchema Schema for validation and transformation.
- * @returns {Model} Return model.
- */
-const createModel = async (driver, rawSchema) => {
-  // extract schema
-  const schemaConfig = {};
-  const originSchema = {};
-
-  for (const key in rawSchema) {
-    if (key[0] === '_' && key[1] === '_') {
-      schemaConfig[key.substring(2)] = rawSchema[key];
+    // default limit
+    let { limit } = params;
+    if (typeof limit === 'number') {
+      if (limit === -1) { delete params.limit; }
     } else {
-      originSchema[key] = rawSchema[key];
+      limit = DEFAULT_LIMIT;
+      params.limit = limit;
+    }
+
+    // pagination: start from 1
+    let { page, skip } = params;
+    if (limit === -1) {
+      page = 1;
+    } else if (limit === 0) {
+      page = 0; // no pagination
+    } else {
+      const skipPage = Math.floor((skip || 0) / limit) + 1;
+      if (page && skipPage !== page) { // page priority
+        skip = (page - 1) * limit;
+        params.skip = skip;
+      } else {
+        page = skipPage;
+      }
+    }
+
+    // default skip
+    skip ||= 0;
+    params.skip = skip;
+
+    // call
+    const docs = await ctx.call(`${driver}.find`, params);
+    const total = await ctx.call(`${driver}.count`, params);
+
+    // over skip
+    if (skip > total) {
+      skip = total;
+    }
+
+    // total page
+    let npage;
+    if (limit === -1) {
+      npage = 1;
+    } else if (limit === 0) {
+      npage = 0;
+    } else {
+      npage = Math.floor(total / limit) + (total % limit === 0 ? 0 : 1);
+    }
+
+    // over skip > page
+    if (skip === total) {
+      page = npage;
+    }
+
+    return {
+      status: 'success',
+      data: docs,
+      ...(page
+        ? {
+            pagination: {
+              total,
+              limit: typeof params.limit === 'number' ? params.limit : -1,
+              skip: skip || 0,
+              page,
+              npage
+            }
+          }
+        : {})
+    };
+  },
+
+  async get (ctx) {
+    const { meta } = ctx;
+    const { driver } = meta;
+    const { id } = ctx.params || {};
+
+    return {
+      status: 'success',
+      data: (await ctx.call(`${driver}.find`, { filters: { _id: id } }))[0] || null
+    };
+  },
+
+  async patch (ctx) {
+    const { meta, params } = ctx;
+    const { driver, schema } = meta;
+    const { id, set } = params || {};
+    const filters = params.filters || {};
+
+    // only patch 1 item
+    filters._id = id;
+    params.filters = filters;
+
+    // validate set
+    const nonRequiredSchema = clone(schema);
+    if (nonRequiredSchema.required) { delete nonRequiredSchema.required; }
+
+    const validate = this.ajv.compile(nonRequiredSchema);
+    const setClone = clone(set || {});
+    if (!validate(setClone)) {
+      return {
+        status: 'error',
+        data: validate.errors.map(item => ({
+          type: `validate.${item.keyword}`,
+          path: item.instancePath,
+          message: item.message
+        }))
+      };
+    }
+
+    const no = await ctx.call(`${driver}.patch`, params);
+
+    if (!no) { return { status: 'error', data: [{ type: 'general', message: 'not patch the document' }] }; }
+
+    return {
+      status: 'success',
+      data: (await ctx.call(`${driver}.find`, { filters }))[0] || null
+    };
+  },
+
+  async remove (ctx) {
+    const { meta, params } = ctx;
+    const { driver } = meta;
+    const { id } = params || {};
+    const filters = params.filters || {};
+
+    // only patch 1 item
+    filters._id = id;
+    params.filters = filters;
+
+    const doc = (await ctx.call(`${driver}.find`, { filters }))[0] || null;
+    if (!doc) { return { status: 'error', data: [{ type: 'general', message: 'not remove the document' }] }; }
+
+    const no = await ctx.call(`${driver}.remove`, { filters });
+    if (!no) { return { status: 'error', data: [{ type: 'general', message: 'not remove the document' }] }; }
+
+    return {
+      status: 'success',
+      data: doc
+    };
+  }
+};
+
+export const hooks = {
+  before: {
+    async '*' ({ meta }) {
+      const { schema } = meta || {};
+
+      if (!schema) { throw new Error('Schema was not defined.'); }
+
+      const [extracted, newSchema] = extractSchema(schema, ['name', 'driver']);
+
+      if (!extracted.name) { throw new Error('Schema name was not defined.'); }
+      if (!extracted.driver) { throw new Error('Schema driver was not defined.'); }
+
+      meta.schema = newSchema;
+      meta.collection = extracted.name;
+      meta.driver = `driver.${extracted.driver}`;
     }
   }
-
-  // create collection
-  const { name, type } = schemaConfig;
-  const schema = type === 'fs' ? { ...FS_SCHEMA, ...originSchema } : originSchema;
-  const collection = await driver.getCollection(name);
-
-  return {
-    ...COLLECTION,
-
-    list: curry(doList)(collection),
-    get: curry(doGet)(collection),
-    create: curry(doCreate)(collection, schema),
-    patch: curry(doPatch)(collection, schema),
-    remove: curry(doRemove)(collection),
-
-    import: collection.import,
-    export: collection.export
-  };
 };
-export default createModel;
+
+/**
+ *
+ */
+export async function started () {
+  this.ajv = new Ajv({ removeAdditional: true, useDefaults: true });
+  addFormats(this.ajv);
+}

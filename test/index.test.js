@@ -1,311 +1,161 @@
 /* eslint-disable */
 
-import { expect, assert } from 'chai';
+import * as modelService from '../src/index.js';
+import { ServiceBroker } from 'moleculer';
+import { expect } from 'chai';
 
-import { COLLECTION } from '../src/constants.js';
-import createFakeDriver from '../src/driver.js';
-import createModel from '../src/index.js';
-import { types } from '../src/validate.js';
+const driverService = {
+  name: 'driver.mem',
+  actions: {
+    async count() { return 32; }
+  }
+}
 
-types.upload = {
-  type(value){
-    if (typeof value !== 'string')
-      throw new InvalidTypeError(value, 'upload');
-
-    return value;
+for (let name of ['create', 'find', 'patch', 'remove']){
+  driverService.actions[name] = async function({ params, meta }){
+    return { name, params, meta, 0: params.filters && params.filters._id !== undefined ? 'ok' : null };
   }
 }
 
 const DEMO_SCHEMA = {
-  __name: 'demo',
-  name: { type: 'text', required: true },
-  slug: { type: 'text', default: '%unislug:name%', editable: false },
-  age: { type: 'number', max: 10, min: 1 },
-  kind: { type: 'text', default: 'human' },
-  avatar: { type: 'upload' }
-}
-
-const FS_SCHEMA = {
-  __name: 'foo',
-  __type: 'fs'
+  name: 'cat',
+  driver: 'mem',
+  title: 'Cat',
+  description: 'Something fun about cat profile',
+  type: 'object',
+  properties: {
+    name: { title: 'Name', description: 'Legal name', type: 'string', maxLength: 60, minLength: 3 },
+    age: { type: 'integer', minimum: 1 },
+    length: { type: 'number', maximum: 2 },
+    male: { type: 'boolean', default: true },
+    hobbies: { type: 'array', uniqueItems: true, maxItems: 3, items: { type: 'string' } },
+    contact: { type: 'object', properties: { email: { type: 'string', format: 'email' }, phone: { type: 'string' }, address: {} } },
+  },
+  required: ['name', 'age'],
+  additionalProperties: false
 }
 
 describe('Model test', () => {
-  let fakeDriver;
+  let broker;
 
   beforeEach(async () => {
-    fakeDriver = await createFakeDriver();
+
+    broker = new ServiceBroker();
+    broker.createService(driverService);
+    broker.createService({
+      ...modelService
+    });
+
+    await broker.start();
   });
 
   afterEach(async () => {
-    await fakeDriver.close();
+    await broker.stop();
   });
 
-  it('should run', async () => {
-    const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-    for (let key in COLLECTION)
-      expect(model).to.has.property(key);
+  it('should create a document', async () => {
+    const resp = await broker.call('model.create', { doc: {
+      name: 'meow',
+      age: 3,
+      length: 1.5,
+      hobbies: ['play', 'sleep'],
+      contact: { email: 'kitty@email.com', phone: '0103456789', address: '12 Sans, Forest' },
+      likes: 10
+    }}, { meta: { schema: DEMO_SCHEMA }});
+    
+    expect(resp).to.has.property('status', 'success');
+    expect(resp.data).to.has.property('name', 'create');
+    expect(resp.data).to.has.property('params');
+    expect(resp.data).to.has.property('meta');
+    expect(resp.data.meta).to.has.property('collection', 'cat');
+    expect(resp.data.meta).to.has.property('driver', 'driver.mem');
   });
 
-  describe('Query test', () => {
+  it('should find documents', async () => {
+    // normal find
+    const resp = await broker.call('model.find', null, { meta: { schema: DEMO_SCHEMA }});
+    expect(resp.data.params).to.has.property('limit', 10);
+    expect(resp.data.params).to.has.property('skip', 0);
+    expect(resp.pagination).to.has.property('total', 32);
+    expect(resp.pagination).to.has.property('limit', 10);
+    expect(resp.pagination).to.has.property('skip', 0);
+    expect(resp.pagination).to.has.property('page', 1);
+    expect(resp.pagination).to.has.property('npage', 4);
 
-    it('should create', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
+    // no pagination
+    const res1 = await broker.call('model.find', { limit: 0 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(res1.data.params).to.has.property('limit', 0);
+    expect(res1.data.params).to.has.property('skip', 0);
+    expect(res1.pagination).to.be.eq(undefined);
 
-      const doc = await model.create({ name: 'This is a foo quéstion', avatar: '/cat.png' });
+    // skip limit pagination
+    const res2 = await broker.call('model.find', { limit: 5, skip: 12 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(res2.data.params).to.has.property('limit', 5);
+    expect(res2.data.params).to.has.property('skip', 12);
+    expect(res2.pagination).to.has.property('total', 32);
+    expect(res2.pagination).to.has.property('limit', 5);
+    expect(res2.pagination).to.has.property('skip', 12);
+    expect(res2.pagination).to.has.property('page', 3);
+    expect(res2.pagination).to.has.property('npage', 7);
 
-      expect(doc).to.has.property('name', 'This is a foo quéstion');
-      expect(doc).to.has.property('slug', 'this-is-a-foo-question');
-      expect(doc).to.has.property('avatar', '/cat.png');
-    });
+    // page pagination
+    const res3 = await broker.call('model.find', { limit: 7, page: 3 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(res3.data.params).to.has.property('limit', 7);
+    expect(res3.data.params).to.has.property('skip', 14);
+    expect(res3.pagination).to.has.property('total', 32);
+    expect(res3.pagination).to.has.property('limit', 7);
+    expect(res3.pagination).to.has.property('skip', 14);
+    expect(res3.pagination).to.has.property('page', 3);
+    expect(res3.pagination).to.has.property('npage', 5);
 
-    it('should get', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
+    // page priotity
+    const res4 = await broker.call('model.find', { limit: 7, page: 3, skip: 25 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(res4.data.params).to.has.property('limit', 7);
+    expect(res4.data.params).to.has.property('skip', 14);
+    expect(res4.pagination).to.has.property('total', 32);
+    expect(res4.pagination).to.has.property('limit', 7);
+    expect(res4.pagination).to.has.property('skip', 14);
+    expect(res4.pagination).to.has.property('page', 3);
+    expect(res4.pagination).to.has.property('npage', 5);
 
-      const doc = await model.create({ name: 'foo', kind: 'animal' });
-      const doc2 = await model.get(doc._id);
-
-      expect(doc2).to.has.property('name', 'foo');
-      expect(doc2).to.has.property('kind', 'animal');
-    });
-
-    it('should get with string id', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({ name: 'foo' });
-      const doc2 = await model.get(doc._id.toString());
-
-      expect(doc2).to.has.property('name', 'foo');
-      expect(doc2).to.has.property('kind', 'human');
-    });
-
-    it('should list', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      await model.create({ name: 'foo' });
-      const res = await model.list({});
-
-      expect(res).to.has.property('total', 1);
-      expect(res).to.has.property('skip', 0);
-      expect(res).to.has.property('limit', 10);
-      expect(res).to.has.property('data');
-      expect(res.data.length).to.be.eq(1);
-      expect(res.data[0]).to.has.property('_id');
-      expect(res.data[0]).to.has.property('name', 'foo');
-      expect(res.data[0]).to.has.property('kind', 'human');
-    });
-
-    it('should list with limit', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      await model.create({ name: 'foo' });
-      const res = await model.list({ $limit: 1, $sort: { name: 1 }, $skip: 'abc' });
-
-      expect(res).to.has.property('total', 1);
-      expect(res).to.has.property('skip', 0);
-      expect(res).to.has.property('limit', 1);
-      expect(res).to.has.property('data');
-      expect(res.data.length).to.be.eq(1);
-      expect(res.data[0]).to.has.property('_id');
-      expect(res.data[0]).to.has.property('name', 'foo');
-      expect(res.data[0]).to.has.property('kind', 'human');
-
-      const res2 = await model.list({ $limit: '-1', $sort: { name: '-1', kind: 'xxx' }, $skip: '1' });
-      expect(res2).to.has.property('total', 1);
-      expect(res2).to.has.property('skip', 1);
-      expect(res2).to.has.property('limit', -1);
-      expect(res2).to.has.property('data');
-    });
-
-    it('should patch', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({ name: 'foo' });
-      const res = await model.patch(doc._id, { name: 'bar', slug: 'bar' });
-
-      expect(res).to.be.eq(1);
-
-      const doc2 = await model.get(doc._id);
-      expect(doc2).to.has.property('name', 'bar');
-      expect(doc2).to.has.property('slug', 'foo');
-    });
-
-    it('should patch with null value to remove field', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({ name: 'foo', age: 5 });
-      const res = await model.patch(doc._id, { age: null });
-
-      expect(res).to.be.eq(1)
-
-      const doc2 = await model.get(doc._id);
-      expect(doc2).not.to.has.property('age');
-    });
-
-    it('should remove', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({ name: 'foo' });
-      const res = await model.remove(doc._id);
-      const doc3 = await model.get(doc._id);
-
-      expect(res).to.be.eq(1);
-      expect(doc3).to.be.eq(null);
-    });
+    // get all
+    const res5 = await broker.call('model.find', { limit: -1, skip: 12 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(res5.data.params).to.not.has.property('limit');
+    expect(res5.data.params).to.has.property('skip', 12);
+    expect(res5.pagination).to.has.property('total', 32);
+    expect(res5.pagination).to.has.property('limit', -1);
+    expect(res5.pagination).to.has.property('skip', 12);
+    expect(res5.pagination).to.has.property('page', 1);
+    expect(res5.pagination).to.has.property('npage', 1);
   });
 
-  describe('Trigger test', () => {
-    it('invalid type error', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
+  it('should get', async () => {
+    // normal
+    const resp = await broker.call('model.get', { id: 0 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(resp).to.has.property('status', 'success');
+    expect(resp).to.has.property('data', 'ok');
 
-      try {
-        await model.create({
-          name: 'foo',
-          age: 'abc'
-        });
-      } catch(err){
-        expect(err.message).to.be.eq('At the age field: Invalid type. Expected number but got abc.');
-        return;
-      }
-
-      assert.fail('Not throw error when empty required');
-    });
-
-    it('should be error when not required', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      try {
-        await model.create({});
-      } catch(err){
-        expect(err.message).to.be.eq('Value of the name field is required.');
-        return;
-      }
-
-      assert.fail('Not throw error when empty required');
-    });
-
-    it('should be error when patch required to null', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-      const doc = await model.create({ name: 'foo' });
-
-      try {
-        await model.patch(doc._id, { name: null });
-      } catch(err){
-        expect(err.message).to.be.eq('Value of the name field is required.');
-        return;
-      }
-
-      assert.fail('Not throw error when empty required');
-    });
-
-    it('should be error when create value greater than max', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      try {
-        await model.create({
-          name: 'foo',
-          age: 11
-        });
-      } catch(err){
-        expect(err.message).to.be.eq('At the age field: Wrong data. 11 is greater than 10.');
-        return;
-      }
-
-      assert.fail('not trigger');
-    });
-
-    it('should be error when patch value greater than max', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({
-        name: 'foo',
-        age: 5
-      });
-
-      try {
-        await model.patch(doc._id, { age: 11 });
-        assert.fail('not trigger');
-      } catch(err){
-        expect(err.message).to.be.eq('At the age field: Wrong data. 11 is greater than 10.');
-      }
-
-      // $inc
-      const res = await model.patch(doc._id, { $inc: { age: 6 } });
-      expect(res).to.be.eq(0);
-    });
-
-    it('should be error when create value smaller than min', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      try {
-        await model.create({
-          name: 'foo',
-          age: 0
-        });
-      } catch(err){
-        expect(err.message).to.be.eq('At the age field: Wrong data. 0 is lower than 1.');
-        return;
-      }
-
-      assert.fail('not trigger');
-    });
-
-    it('should be error when patch value smaller than min', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-
-      const doc = await model.create({
-        name: 'foo',
-        age: 5
-      });
-
-      try {
-        await model.patch(doc._id, { age: 0 });
-        assert.fail('not trigger');
-      } catch(err){
-        expect(err.message).to.be.eq('At the age field: Wrong data. 0 is lower than 1.');
-      }
-
-      // $inc
-      const res = await model.patch(doc._id, { $inc: { age: -5 } });
-      expect(res).to.be.eq(0);
-    });
+    // null
+    const res1 = await broker.call('model.get', null, { meta: { schema: DEMO_SCHEMA }});
+    expect(res1).to.has.property('status', 'success');
+    expect(res1).to.has.property('data', null);
   });
 
-  describe('FS test', () => {
-    it('should be create', async () => {
-      const model = await createModel(fakeDriver, FS_SCHEMA);
+  it('should patch', async () => {
+    const resp = await broker.call('model.patch', { 
+      id: 0, 
+      set: { length: 1.75 }, 
+      inc: { age: 1 }, 
+      unset: { male: '' }
+    }, { meta: { schema: DEMO_SCHEMA }});
+    expect(resp).to.has.property('status', 'success');
+    expect(resp).to.has.property('data', 'ok');
+  });
+
+  it('should remove', async () => {
+    const resp = await broker.call('model.remove', { id: 0 }, { meta: { schema: DEMO_SCHEMA }});
+    expect(resp).to.has.property('status', 'success');
+    expect(resp).to.has.property('data', 'ok');
+  });
   
-      const doc = await model.create({
-        name: 'xin-chao.txt'
-      });
-  
-      expect(doc).to.has.property('_id');
-      expect(doc).to.has.property('name', 'xin-chao.txt');
-    });
-  });
-
-  describe('Default function test', () => {
-    it('should not dupplicated slug', async () => {
-      const model = await createModel(fakeDriver, DEMO_SCHEMA);
-  
-      const doc = await model.create({
-        name: 'This is a quéstion'
-      });
-
-      expect(doc).to.has.property('slug', 'this-is-a-question');
-
-      const doc2 = await model.create({
-        name: 'This is a quéstion'
-      });
-
-      expect(doc2).to.has.property('slug', 'this-is-a-question-1');
-
-      const doc3 = await model.create({
-        name: 'This is a quéstion'
-      });
-
-      expect(doc3).to.has.property('slug', 'this-is-a-question-2');
-    }); 
-  });
 });
