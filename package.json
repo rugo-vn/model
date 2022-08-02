@@ -1,6 +1,6 @@
 {
   "name": "@rugo-vn/model",
-  "version": "2.0.0-beta.0",
+  "version": "2.0.0-beta.2",
   "description": "Rugo Drivers for contact with drivers.",
   "main": "./src/index.js",
   "type": "module",
