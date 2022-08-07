@@ -27,6 +27,10 @@ export const actions = {
     const { doc } = params || {};
     const { driver, schema } = meta;
 
+    const current = (new Date()).toISOString();
+    doc.createdAt = current;
+    doc.updatedAt = current;
+
     const validate = this.ajv.compile(schema);
     const rel = validate(doc);
 
@@ -154,9 +158,16 @@ export const actions = {
     // validate set
     const nonRequiredSchema = clone(schema);
     if (nonRequiredSchema.required) { delete nonRequiredSchema.required; }
+    for (let key in nonRequiredSchema.properties)
+      if (nonRequiredSchema.properties[key].default !== undefined)
+        delete nonRequiredSchema.properties[key].default;
 
     const validate = this.ajv.compile(nonRequiredSchema);
     const setClone = clone(set || {});
+
+    const current = (new Date()).toISOString();
+    setClone.updatedAt = current;
+
     if (!validate(setClone)) {
       return {
         status: 'error',
@@ -167,6 +178,10 @@ export const actions = {
         }))
       };
     }
+    params.set = setClone;
+
+    if (schema.properties.version)
+      params.inc ||= { version: 1 };
 
     const no = await ctx.call(`${driver}.patch`, params);
 
@@ -203,19 +218,42 @@ export const actions = {
 
 export const hooks = {
   before: {
-    async '*' ({ meta }) {
+    async '*' (ctx) {
+      const { meta, locals } = ctx;
       const { schema } = meta || {};
 
       if (!schema) { throw new Error('Schema was not defined.'); }
 
-      const [extracted, newSchema] = extractSchema(schema, ['name', 'driver']);
+      const [extracted, newSchema] = extractSchema(clone(schema), ['name', 'driver', 'identities', 'timestamp', 'version']);
 
       if (!extracted.name) { throw new Error('Schema name was not defined.'); }
       if (!extracted.driver) { throw new Error('Schema driver was not defined.'); }
 
+      locals.schema = schema;
       meta.schema = newSchema;
       meta.collection = extracted.name;
       meta.driver = `driver.${extracted.driver}`;
+
+      meta.schema.additionalProperties = false;
+      if (extracted.timestamp){
+        meta.schema.properties ||= {};
+        meta.schema.properties.createdAt = { type: 'string' };
+        meta.schema.properties.updatedAt = { type: 'string' };
+      }
+
+      if (extracted.version){
+        meta.schema.properties ||= {};
+        meta.schema.properties.version = { type: 'integer', default: 1 };
+      }
+    }
+  },
+
+  after: {
+    async '*' (ctx, res) {
+      const { locals, meta } = ctx;
+      meta.schema = locals.schema;
+
+      return res;
     }
   }
 };
