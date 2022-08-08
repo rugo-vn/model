@@ -218,8 +218,8 @@ export const actions = {
 
 export const hooks = {
   before: {
-    async '*' (ctx) {
-      const { meta, locals } = ctx;
+    async all(ctx) {
+      const { meta } = ctx;
       const { schema } = meta || {};
 
       if (!schema) { throw new Error('Schema was not defined.'); }
@@ -229,7 +229,6 @@ export const hooks = {
       if (!extracted.name) { throw new Error('Schema name was not defined.'); }
       if (!extracted.driver) { throw new Error('Schema driver was not defined.'); }
 
-      locals.schema = schema;
       meta.schema = newSchema;
       meta.collection = extracted.name;
       meta.driver = `driver.${extracted.driver}`;
@@ -245,15 +244,6 @@ export const hooks = {
         meta.schema.properties ||= {};
         meta.schema.properties.version = { type: 'integer', default: 1 };
       }
-    }
-  },
-
-  after: {
-    async '*' (ctx, res) {
-      const { locals, meta } = ctx;
-      meta.schema = locals.schema;
-
-      return res;
     }
   }
 };
