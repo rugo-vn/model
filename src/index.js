@@ -120,17 +120,13 @@ export const actions = {
     return {
       status: 'success',
       data: docs,
-      ...(page
-        ? {
-            pagination: {
-              total,
-              limit: typeof params.limit === 'number' ? params.limit : -1,
-              skip: skip || 0,
-              page,
-              npage
-            }
-          }
-        : {})
+      pagination: {
+        total,
+        limit: typeof params.limit === 'number' ? params.limit : -1,
+        skip: skip || 0,
+        page,
+        npage
+      }
     };
   },
 
