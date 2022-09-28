@@ -1,8 +1,8 @@
-import { RugoError } from "@rugo-vn/service";
-import { NotFoundError } from "./exceptions.js";
-import { DEFAULT_LIMIT, ModelResp } from "./utils.js";
+import { RugoError } from '@rugo-vn/service';
+import { NotFoundError } from './exceptions.js';
+import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
-export const find = async function({ driver: driverName, query, limit, sort, skip, page }, nextCall) {
+export const find = async function ({ driver: driverName, query, limit, sort, skip, page }, nextCall) {
   // default limit
   limit = parseInt(limit);
   if (isNaN(limit)) {
@@ -29,7 +29,7 @@ export const find = async function({ driver: driverName, query, limit, sort, ski
   skip ||= 0;
 
   // call
-  const docs = limit === 0 ? [] : await nextCall(`driver.${driverName}.find`, { query, ...(limit === -1 ? {} : { limit }) , sort, skip });
+  const docs = limit === 0 ? [] : await nextCall(`driver.${driverName}.find`, { query, ...(limit === -1 ? {} : { limit }), sort, skip });
   const total = await nextCall(`driver.${driverName}.count`, { query });
 
   // over skip
@@ -61,24 +61,23 @@ export const find = async function({ driver: driverName, query, limit, sort, ski
   });
 };
 
-export const count = async function({ driver: driverName, query }, nextCall ) {
+export const count = async function ({ driver: driverName, query }, nextCall) {
   return ModelResp(await nextCall(`driver.${driverName}.count`, { query }));
-}
+};
 
-export const create = async function ({ driver: driverName, data: doc}, nextCall) {
+export const create = async function ({ driver: driverName, data: doc }, nextCall) {
   return ModelResp(await nextCall(`driver.${driverName}.create`, { data: doc }));
 };
 
-export const get = async function({ driver: driverName, id }, nextCall) {
-  const doc = (await nextCall(`driver.${driverName}.find`, { query: { _id: id }}))[0];
+export const get = async function ({ driver: driverName, id }, nextCall) {
+  const doc = (await nextCall(`driver.${driverName}.find`, { query: { _id: id } }))[0];
 
-  if (!doc)
-    throw new NotFoundError(`Doc not found`);
+  if (!doc) { throw new NotFoundError('Doc not found'); }
 
   return ModelResp(doc);
-}
+};
 
-export const update = async function({ driver: driverName, id, set, unset, inc }, nextCall) {
+export const update = async function ({ driver: driverName, id, set, unset, inc }, nextCall) {
   // try find
   await get.bind(this)({ driver: driverName, id }, nextCall);
 
@@ -86,28 +85,25 @@ export const update = async function({ driver: driverName, id, set, unset, inc }
   const no = await nextCall(`driver.${driverName}.update`, { query: { _id: id }, set, unset, inc });
 
   // result
-  if (!no)
-    throw new RugoError(`Cannot update the doc`);
+  if (!no) { throw new RugoError('Cannot update the doc'); }
 
   try {
     return ModelResp((await get.bind(this)({ driver: driverName, id }, nextCall)).data);
-  } catch(err){
-    if (err instanceof NotFoundError)
-      throw new RugoError(`The id of doc was changed`);
+  } catch (err) {
+    if (err instanceof NotFoundError) { throw new RugoError('The id of doc was changed'); }
 
     throw err;
   }
-}
+};
 
-export const remove = async function({ driver: driverName, id }, nextCall) {
+export const remove = async function ({ driver: driverName, id }, nextCall) {
   const doc = (await get.bind(this)({ driver: driverName, id }, nextCall)).data;
 
   // remove
   const no = await nextCall(`driver.${driverName}.remove`, { query: { _id: id } });
 
   // result
-  if (!no)
-    throw new RugoError(`Cannot remove the doc`);
+  if (!no) { throw new RugoError('Cannot remove the doc'); }
 
   return ModelResp(doc);
-}
+};

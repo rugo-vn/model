@@ -1,4 +1,4 @@
-import { RugoError } from "@rugo-vn/service";
+import { RugoError } from '@rugo-vn/service';
 
 export class AclError extends RugoError {
   constructor (msg) {
