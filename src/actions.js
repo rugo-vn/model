@@ -1,4 +1,4 @@
-import { RugoError } from '@rugo-vn/service';
+import { RugoException } from '@rugo-vn/service';
 import { NotFoundError } from './exceptions.js';
 import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
@@ -85,12 +85,12 @@ export const update = async function ({ driver: driverName, id, set, unset, inc 
   const no = await nextCall(`driver.${driverName}.update`, { query: { _id: id }, set, unset, inc });
 
   // result
-  if (!no) { throw new RugoError('Cannot update the doc'); }
+  if (!no) { throw new RugoException('Cannot update the doc'); }
 
   try {
     return ModelResp((await get.bind(this)({ driver: driverName, id }, nextCall)).data);
   } catch (err) {
-    if (err instanceof NotFoundError) { throw new RugoError('The id of doc was changed'); }
+    if (err instanceof NotFoundError) { throw new RugoException('The id of doc was changed'); }
 
     throw err;
   }
@@ -103,7 +103,7 @@ export const remove = async function ({ driver: driverName, id }, nextCall) {
   const no = await nextCall(`driver.${driverName}.remove`, { query: { _id: id } });
 
   // result
-  if (!no) { throw new RugoError('Cannot remove the doc'); }
+  if (!no) { throw new RugoException('Cannot remove the doc'); }
 
   return ModelResp(doc);
 };

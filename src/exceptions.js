@@ -1,6 +1,6 @@
-import { RugoError } from '@rugo-vn/service';
+import { RugoException } from '@rugo-vn/service';
 
-export class AclError extends RugoError {
+export class AclError extends RugoException {
   constructor (msg) {
     super(msg);
 
@@ -8,7 +8,7 @@ export class AclError extends RugoError {
   }
 }
 
-export class NotFoundError extends RugoError {
+export class NotFoundError extends RugoException {
   constructor (msg) {
     super(msg);
 

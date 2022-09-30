@@ -1,4 +1,4 @@
-import { RugoError } from '@rugo-vn/service';
+import { RugoException } from '@rugo-vn/service';
 import { path } from 'ramda';
 
 import * as actions from './actions.js';
@@ -21,8 +21,8 @@ export const before = {
     const driver = path(['schema', '_driver'], args);
     const acls = path(['schema', '_acls'], args);
 
-    if (!name) { throw new RugoError(`Model name ${args.schema ? '_name ' : ''}is not defined.`); }
-    if (!driver) { throw new RugoError('Model type is not defined.'); }
+    if (!name) { throw new RugoException(`Model name ${args.schema ? '_name ' : ''}is not defined.`); }
+    if (!driver) { throw new RugoException('Model type is not defined.'); }
 
     args.name = name;
     args.driver = driver;
