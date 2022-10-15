@@ -2,7 +2,7 @@ import { RugoException } from '@rugo-vn/service';
 import { NotFoundError } from './exceptions.js';
 import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
-export const find = async function ({ driver: driverName, query, limit, sort, skip, page }, nextCall) {
+export const find = async function ({ driver: driverName, query, limit, sort, skip, page, nextCall }) {
   // default limit
   limit = parseInt(limit);
   if (isNaN(limit)) {
@@ -61,15 +61,15 @@ export const find = async function ({ driver: driverName, query, limit, sort, sk
   });
 };
 
-export const count = async function ({ driver: driverName, query }, nextCall) {
+export const count = async function ({ driver: driverName, query, nextCall }) {
   return ModelResp(await nextCall(`driver.${driverName}.count`, { query }));
 };
 
-export const create = async function ({ driver: driverName, data: doc }, nextCall) {
+export const create = async function ({ driver: driverName, data: doc, nextCall }) {
   return ModelResp(await nextCall(`driver.${driverName}.create`, { data: doc }));
 };
 
-export const get = async function ({ driver: driverName, id }, nextCall) {
+export const get = async function ({ driver: driverName, id, nextCall }) {
   const doc = (await nextCall(`driver.${driverName}.find`, { query: { _id: id } }))[0];
 
   if (!doc) { throw new NotFoundError('Doc not found'); }
@@ -77,9 +77,9 @@ export const get = async function ({ driver: driverName, id }, nextCall) {
   return ModelResp(doc);
 };
 
-export const update = async function ({ driver: driverName, id, set, unset, inc }, nextCall) {
+export const update = async function ({ driver: driverName, id, set, unset, inc, nextCall }) {
   // try find
-  await get.bind(this)({ driver: driverName, id }, nextCall);
+  await get.bind(this)({ driver: driverName, id, nextCall });
 
   // update
   const no = await nextCall(`driver.${driverName}.update`, { query: { _id: id }, set, unset, inc });
@@ -88,7 +88,7 @@ export const update = async function ({ driver: driverName, id, set, unset, inc 
   if (!no) { throw new RugoException('Cannot update the doc'); }
 
   try {
-    return ModelResp((await get.bind(this)({ driver: driverName, id }, nextCall)).data);
+    return ModelResp((await get.bind(this)({ driver: driverName, id, nextCall })).data);
   } catch (err) {
     if (err instanceof NotFoundError) { throw new RugoException('The id of doc was changed'); }
 
@@ -96,8 +96,8 @@ export const update = async function ({ driver: driverName, id, set, unset, inc 
   }
 };
 
-export const remove = async function ({ driver: driverName, id }, nextCall) {
-  const doc = (await get.bind(this)({ driver: driverName, id }, nextCall)).data;
+export const remove = async function ({ driver: driverName, id, nextCall }) {
+  const doc = (await get.bind(this)({ driver: driverName, id, nextCall })).data;
 
   // remove
   const no = await nextCall(`driver.${driverName}.remove`, { query: { _id: id } });
@@ -107,3 +107,5 @@ export const remove = async function ({ driver: driverName, id }, nextCall) {
 
   return ModelResp(doc);
 };
+
+export const register = async function () { return ModelResp(true); };

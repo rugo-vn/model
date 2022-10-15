@@ -11,4 +11,6 @@ export const started = async function () {
 
     this.drivers.push(service.name);
   }
+
+  this.registers = {};
 };

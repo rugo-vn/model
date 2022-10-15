@@ -1,3 +1,4 @@
+import hash from 'object-hash';
 import { RugoException } from '@rugo-vn/service';
 import { path } from 'ramda';
 
@@ -16,17 +17,30 @@ for (const actionName of Object.keys(actions)) {
 }
 
 export const before = {
-  all (args) {
-    const name = path(['schema', '_name'], args);
-    const driver = path(['schema', '_driver'], args);
-    const acls = path(['schema', '_acls'], args);
+  all (args = {}) {
+    const name = path(['schema', '_name'], args) || args.name;
+    if (!name) { throw new RugoException(`Model name "${name}" is not defined.`); }
 
-    if (!name) { throw new RugoException(`Model name ${args.schema ? '_name ' : ''}is not defined.`); }
+    const register = this.registers[name] || {};
+
+    const schema = args.schema || register.schema;
+    if (!schema) { throw new RugoException(`Cannot find schema for model "${name}"`); }
+
+    const hashed = hash(schema);
+    if (register.hashed !== hashed) {
+      register.name = name;
+      register.hashed = hashed;
+      register.schema = schema;
+      this.registers[name] = register;
+    }
+
+    const driver = schema._driver;
     if (!driver) { throw new RugoException('Model type is not defined.'); }
 
     args.name = name;
     args.driver = driver;
-    args.acls = acls || [];
+    args.acls = schema._acls || [];
+    args.nextCall = (nextAddress, nextArgs) => this.call(nextAddress, { ...nextArgs, schema });
   },
   ...actionHooks
 };
