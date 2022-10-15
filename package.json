@@ -25,7 +25,7 @@
     "mocha": "^10.0.0"
   },
   "dependencies": {
-    "@rugo-vn/service": "^2.0.0",
+    "@rugo-vn/service": "../service",
     "ramda": "^0.28.0"
   }
 }
