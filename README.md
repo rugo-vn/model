@@ -98,6 +98,19 @@ Return:
   - **`{number} meta.page`** current page (started by `1`).
   - **`{number} meta.npage`** number of pages, total pages.
 
+### `get`
+
+Get a doc
+
+Arguments:
+
+- **`{string} id`** doc id.
+
+Return: 
+
+- **`{doc} data`** result doc.
+
+
 ### `count`
 
 Count by `query`.
