@@ -2,6 +2,7 @@ import { RugoException } from '@rugo-vn/service';
 
 import * as actions from './actions.js';
 import { AclError } from './exceptions.js';
+import { parseSchema } from './utils.js';
 
 const actionHooks = {};
 for (const actionName of Object.keys(actions)) {
@@ -25,10 +26,14 @@ export const before = {
     const driver = schema._driver;
     if (!driver) { throw new RugoException('Model type is not defined.'); }
 
+    const [nextSchema, extSchema] = parseSchema(schema);
+
     args.name = name;
     args.driver = driver;
     args.acls = schema._acls || [];
-    args.nextCall = (nextAddress, nextArgs) => this.call(nextAddress, { ...nextArgs, schema });
+    args.schema = nextSchema;
+    args.extSchema = extSchema;
+    args.nextCall = (nextAddress, nextArgs) => this.call(nextAddress, { ...nextArgs, schema: nextSchema });
   },
   ...actionHooks
 };

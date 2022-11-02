@@ -65,8 +65,14 @@ export const count = async function ({ driver: driverName, query, nextCall }) {
   return ModelResp(await nextCall(`driver.${driverName}.count`, { query }));
 };
 
-export const create = async function ({ driver: driverName, data: doc, nextCall }) {
-  return ModelResp(await nextCall(`driver.${driverName}.create`, { data: doc }));
+export const create = async function ({ driver: driverName, data: doc, schema, extSchema }) {
+  if (extSchema) {
+    await this.validate({ doc, schema: extSchema });
+  }
+
+  const resp = await this.call(`driver.${driverName}.create`, { data: doc, schema });
+
+  return ModelResp(resp);
 };
 
 export const get = async function ({ driver: driverName, id, nextCall }) {
@@ -77,7 +83,11 @@ export const get = async function ({ driver: driverName, id, nextCall }) {
   return ModelResp(doc);
 };
 
-export const update = async function ({ driver: driverName, id, set, unset, inc, nextCall }) {
+export const update = async function ({ driver: driverName, id, set, unset, inc, extSchema, nextCall }) {
+  if (extSchema) {
+    await this.validate({ doc: set, schema: extSchema });
+  }
+
   // try find
   await get.bind(this)({ driver: driverName, id, nextCall });
 
