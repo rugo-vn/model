@@ -1,6 +1,4 @@
-import hash from 'object-hash';
 import { RugoException } from '@rugo-vn/service';
-import { path } from 'ramda';
 
 import * as actions from './actions.js';
 import { AclError } from './exceptions.js';
@@ -18,21 +16,11 @@ for (const actionName of Object.keys(actions)) {
 
 export const before = {
   all (args = {}) {
-    const name = path(['schema', '_name'], args) || args.name;
+    const name = args.name;
     if (!name) { throw new RugoException(`Model name "${name}" is not defined.`); }
 
-    const register = this.registers[name] || {};
-
-    const schema = args.schema || register.schema;
+    const schema = this.globals[`schema.${name}`];
     if (!schema) { throw new RugoException(`Cannot find schema for model "${name}"`); }
-
-    const hashed = hash(schema);
-    if (register.hashed !== hashed) {
-      register.name = name;
-      register.hashed = hashed;
-      register.schema = schema;
-      this.registers[name] = register;
-    }
 
     const driver = schema._driver;
     if (!driver) { throw new RugoException('Model type is not defined.'); }

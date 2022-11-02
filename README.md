@@ -16,6 +16,7 @@ A data connection layer for driver service:
 - Easy to use.
 - Simple ACL.
 - Cache schema.
+- Extended schema types.
 - Wrap result.
 
 ## Settings
@@ -24,9 +25,13 @@ It does not have any settings.
 
 ## Common
 
+### Globals
+
+- `schema.<modelName>`
+
 ### Input Args
 
-- All common actions require `schema` args or `name` (if schema was registered).
+- All common actions require `name` of schema.
 - Set `acl` to `true` to enable access control list.
 
 ### Schema
@@ -35,6 +40,14 @@ Using schema as driver but it has some additions:
 
 - `_driver`: Driver name, choose driver to handle deeper action.
 - `_acls`: Access controls list, which item is the action name. It's public by default, but when `args` contains `acl=true`, it will prevent user to do the model action.
+
+We have some extended types:
+
+- `relation` -> `string`
+- `shortText` -> `string`
+- `richText` -> `string`
+- `codeText` -> `string`
+- `json` -> `object` or `array`
 
 ### Response
 

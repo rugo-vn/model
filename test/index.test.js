@@ -33,6 +33,9 @@ describe('model test', () => {
         './src/index.js',
         './test/sample.driver.js'
       ],
+      _globals: {
+        [`schema.${schema._name}`]: schema,
+      }
     });
 
     await broker.loadServices();
@@ -45,7 +48,7 @@ describe('model test', () => {
 
   it('should find documents', async () => {
     // normal find
-    const resp = await broker.call('model.find', { schema });
+    const resp = await broker.call('model.find', { name: schema._name });
 
     expect(resp.data).to.has.property('limit', 10);
     expect(resp.data).to.has.property('skip', 0);
@@ -56,13 +59,13 @@ describe('model test', () => {
     expect(resp.meta).to.has.property('npage', 4);
 
     // no pagination
-    const res1 = await broker.call('model.find', { limit: 0, schema });
+    const res1 = await broker.call('model.find', { limit: 0, name: schema._name });
     expect(res1.data).to.has.property('length', 0);
     expect(res1.meta).to.has.property('limit', 0);
     expect(res1.meta).to.has.property('skip', 0);
 
     // skip limit pagination
-    const res2 = await broker.call('model.find', { limit: 5, skip: 12, schema });
+    const res2 = await broker.call('model.find', { limit: 5, skip: 12, name: schema._name });
     expect(res2.data).to.has.property('limit', 5);
     expect(res2.data).to.has.property('skip', 12);
     expect(res2.meta).to.has.property('total', 32);
@@ -72,7 +75,7 @@ describe('model test', () => {
     expect(res2.meta).to.has.property('npage', 7);
 
     // page pagination
-    const res3 = await broker.call('model.find', { limit: 7, page: 3, schema });
+    const res3 = await broker.call('model.find', { limit: 7, page: 3, name: schema._name });
     expect(res3.data).to.has.property('limit', 7);
     expect(res3.data).to.has.property('skip', 14);
     expect(res3.meta).to.has.property('total', 32);
@@ -82,7 +85,7 @@ describe('model test', () => {
     expect(res3.meta).to.has.property('npage', 5);
 
     // page priotity
-    const res4 = await broker.call('model.find', { limit: 7, page: 3, skip: 25, schema });
+    const res4 = await broker.call('model.find', { limit: 7, page: 3, skip: 25, name: schema._name });
     expect(res4.data).to.has.property('limit', 7);
     expect(res4.data).to.has.property('skip', 14);
     expect(res4.meta).to.has.property('total', 32);
@@ -92,7 +95,7 @@ describe('model test', () => {
     expect(res4.meta).to.has.property('npage', 5);
 
     // get all
-    const res5 = await broker.call('model.find', { limit: -1, skip: 12, schema });
+    const res5 = await broker.call('model.find', { limit: -1, skip: 12, name: schema._name });
     expect(res5.data).to.not.has.property('limit');
     expect(res5.data).to.has.property('skip', 12);
     expect(res5.meta).to.has.property('total', 32);
@@ -104,7 +107,7 @@ describe('model test', () => {
 
   it('should count documents', async () => {
     // normal find
-    const resp = await broker.call('model.count', { schema });
+    const resp = await broker.call('model.count', { name: schema._name });
 
     expect(resp).to.has.property('data', 32);
     expect(resp).to.not.has.property('meta');
@@ -118,7 +121,7 @@ describe('model test', () => {
       hobbies: ['play', 'sleep'],
       contact: { email: 'kitty@email.com', phone: '0103456789', address: '12 Sans, Forest' },
       likes: 10
-    }, schema });
+    }, name: schema._name });
     
     expect(resp.data).to.has.property('data');
     expect(resp.data).to.has.property('schema');
@@ -130,25 +133,25 @@ describe('model test', () => {
       set: { length: 1.75 }, 
       inc: { age: 1 }, 
       unset: { male: '' }
-   , schema });
+   , name: schema._name });
 
     expect(resp.data.query).to.has.property('_id', 0);
   });
 
   it('should remove', async () => {
-    const resp = await broker.call('model.remove', { id: 0, schema });
+    const resp = await broker.call('model.remove', { id: 0, name: schema._name });
     
     expect(resp.data.query).to.has.property('_id', 0);
   });
 
   it('should get', async () => {
     // normal
-    const resp = await broker.call('model.get', { id: 0, schema });
+    const resp = await broker.call('model.get', { id: 0, name: schema._name });
     expect(resp.data.query).to.has.property('_id', 0);
 
     // null
     try {
-      await broker.call('model.get', { schema });
+      await broker.call('model.get', { name: schema._name });
       assert.fail('should error');
     } catch(errs) {
       expect(errs[0] instanceof NotFoundError).to.be.eq(true);
@@ -156,34 +159,14 @@ describe('model test', () => {
   });
 
   it('should acl', async () => {
-    const resp = await broker.call('model.get', { id: 0, schema, acl: true });
+    const resp = await broker.call('model.get', { id: 0, name: schema._name, acl: true });
     expect(resp.data.query).to.has.property('_id', 0);
 
     try {
-      await broker.call('model.count', { schema, acl: true });
+      await broker.call('model.count', { name: schema._name, acl: true });
       assert.fail('should error');
     } catch(errs) {
       expect(errs[0] instanceof AclError).to.be.eq(true);
     }
-  });
-
-  it('should register schema', async () => {
-    const resp = await broker.call('model.get', { id: 0, name: schema._name });
-    expect(resp.data.query).to.has.property('_id', 0);
-
-    const resp2 = await broker.call('model.register', { name: 'cat', schema: {
-      _name: 'dog',
-      _driver: 'sample',
-      type: 'object',
-      properties: {
-        nickname: { type: 'string' }
-      }
-    }});
-
-    expect(resp2).to.has.property('data', true);
-
-    const resp3 = await broker.call('model.create', { data: { nickname: 'meow' }, name: 'dog' });
-    expect(resp3.data.data).to.has.property('nickname', 'meow');
-    expect(resp3.data.schema).to.has.property('_name', 'dog');
   });
 });
