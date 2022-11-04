@@ -43,11 +43,14 @@ Using schema as driver but it has some additions:
 
 We have some extended types:
 
-- `relation` -> `string`
-- `shortText` -> `string`
+**`relation` -> `string`**
+
+- `ref` reference model name
+
+<!-- - `shortText` -> `string`
 - `richText` -> `string`
 - `codeText` -> `string`
-- `json` -> `object` or `array`
+- `json` -> `object` or `array` -->
 
 ### Response
 

@@ -2,7 +2,7 @@ import { RugoException } from '@rugo-vn/service';
 import { NotFoundError } from './exceptions.js';
 import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
-export const find = async function ({ driver: driverName, query, limit, sort, skip, page, nextCall }) {
+export const find = async function ({ driver: driverName, query, limit, sort, skip, page, search, nextCall }) {
   // default limit
   limit = parseInt(limit);
   if (isNaN(limit)) {
@@ -29,8 +29,8 @@ export const find = async function ({ driver: driverName, query, limit, sort, sk
   skip ||= 0;
 
   // call
-  const docs = limit === 0 ? [] : await nextCall(`driver.${driverName}.find`, { query, ...(limit === -1 ? {} : { limit }), sort, skip });
-  const total = await nextCall(`driver.${driverName}.count`, { query });
+  const docs = limit === 0 ? [] : await nextCall(`driver.${driverName}.find`, { query, ...(limit === -1 ? {} : { limit }), sort, skip, search });
+  const total = await nextCall(`driver.${driverName}.count`, { query, search });
 
   // over skip
   if (skip > total) {

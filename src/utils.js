@@ -1,12 +1,11 @@
-import { clone } from "ramda";
+import { clone } from 'ramda';
 
 export const DEFAULT_LIMIT = 10;
 
 export const ModelResp = (data, meta) => ({ data, ...(meta ? { meta } : {}) });
 
 export const parseSchema = schema => {
-  if (!schema)
-    return [undefined, []];
+  if (!schema) { return [undefined, []]; }
 
   const resultSchema = clone(schema);
 
@@ -14,24 +13,23 @@ export const parseSchema = schema => {
     const props = resultSchema.properties || {};
     const exts = {};
 
-    for (let key in props){
+    for (const key in props) {
       const [sch, ext] = parseSchema(props[key]);
 
       props[key] = sch;
 
-      if (ext)
-        exts[key] = ext;
+      if (ext) { exts[key] = ext; }
     }
 
     resultSchema.properties = props;
 
-    return [resultSchema, Object.keys(exts).length ? { type: 'object', properties: exts } : undefined]
+    return [resultSchema, Object.keys(exts).length ? { type: 'object', properties: exts } : undefined];
   }
 
   if (resultSchema.type === 'array') {
     const [sch, ext] = parseSchema(resultSchema.items);
 
-    if (sch){
+    if (sch) {
       resultSchema.items = sch;
     } else {
       delete resultSchema.items;
@@ -40,9 +38,9 @@ export const parseSchema = schema => {
     return [resultSchema, ext ? { type: 'array', items: ext } : undefined];
   }
 
-  if (['string', 'number', 'integer', 'boolean'].indexOf(resultSchema.type) === -1){
+  if (['string', 'number', 'integer', 'boolean'].indexOf(resultSchema.type) === -1) {
     return [{}, resultSchema];
   }
 
   return [resultSchema];
-}
+};
