@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@rugo-vn/service": "../service",
+    "mime": "^3.0.0",
     "ramda": "^0.28.0"
   }
 }

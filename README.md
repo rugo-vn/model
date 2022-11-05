@@ -45,7 +45,13 @@ We have some extended types:
 
 **`relation` -> `string`**
 
-- `ref` reference model name
+- `ref` reference model name.
+
+**`file` -> `string`**
+
+- `ref` Reference model name.
+- `prefix` Value must have this at head, and ignore a head part of value for validation.
+- `mimes` Allowed mime list.
 
 <!-- - `shortText` -> `string`
 - `richText` -> `string`
