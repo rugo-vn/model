@@ -53,10 +53,9 @@ We have some extended types:
 - `prefix` Value must have this at head, and ignore a head part of value for validation.
 - `mimes` Allowed mime list.
 
-<!-- - `shortText` -> `string`
-- `richText` -> `string`
-- `codeText` -> `string`
-- `json` -> `object` or `array` -->
+**`rich` -> `string`**
+
+- `image` a `file` schema for image selection.
 
 ### Response
 

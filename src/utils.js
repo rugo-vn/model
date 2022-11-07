@@ -40,7 +40,10 @@ export const parseSchema = (schema, root = true) => {
   }
 
   if (['string', 'number', 'integer', 'boolean'].indexOf(resultSchema.type) === -1) {
-    return [DEFAULT_TYPE_SCHEMAS[resultSchema.type] || {}, resultSchema];
+    return [
+      DEFAULT_TYPE_SCHEMAS[resultSchema.type] || {},
+      resultSchema
+    ];
   }
 
   return [resultSchema];
