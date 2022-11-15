@@ -19,6 +19,8 @@ export const validate = async function ({ doc, schema }) {
   }
 
   if (typeof doc === 'object') {
+    if (schema.type === 'json') { return true; }
+
     if (schema.type !== 'object' && !schema.properties) { throw new RugoException(`${doc} should be an object`); }
 
     for (const key in doc) {
