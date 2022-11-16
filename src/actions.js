@@ -2,6 +2,10 @@ import { RugoException } from '@rugo-vn/service';
 import { NotFoundError } from './exceptions.js';
 import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
+const defaultAction = action => async function ({ driver: driverName, nextCall, ...args }) {
+  return ModelResp(await nextCall(`driver.${driverName}.${action}`, args));
+};
+
 export const find = async function ({ driver: driverName, query, limit, sort, skip, page, search, nextCall }) {
   // default limit
   limit = parseInt(limit);
@@ -118,4 +122,8 @@ export const remove = async function ({ driver: driverName, id, nextCall }) {
   return ModelResp(doc);
 };
 
-export const register = async function () { return ModelResp(true); };
+export const extract = defaultAction('extract');
+
+export const compress = defaultAction('compress');
+
+export const restore = defaultAction('restore');
