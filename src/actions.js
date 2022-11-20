@@ -3,6 +3,10 @@ import { NotFoundError } from './exceptions.js';
 import { DEFAULT_LIMIT, ModelResp } from './utils.js';
 
 const defaultAction = action => async function ({ driver: driverName, nextCall, ...args }) {
+  if (args.id) {
+    args.query ||= {};
+    args.query._id = args.id;
+  }
   return ModelResp(await nextCall(`driver.${driverName}.${action}`, args));
 };
 
@@ -123,7 +127,6 @@ export const remove = async function ({ driver: driverName, id, nextCall }) {
 };
 
 export const extract = defaultAction('extract');
-
 export const compress = defaultAction('compress');
-
+export const backup = defaultAction('backup');
 export const restore = defaultAction('restore');
