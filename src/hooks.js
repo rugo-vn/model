@@ -1,8 +1,5 @@
-import { RugoException } from '@rugo-vn/service';
-
 import * as actions from './actions.js';
-import { AclError } from './exceptions.js';
-import { parseSchema } from './utils.js';
+import { AclError, RugoException } from '@rugo-vn/exception';
 
 const actionHooks = {};
 for (const actionName of Object.keys(actions)) {
@@ -23,17 +20,12 @@ export const before = {
     const schema = this.globals[`schema.${name}`];
     if (!schema) { throw new RugoException(`Cannot find schema for model "${name}"`); }
 
-    const driver = schema._driver;
+    const driver = schema.driver;
     if (!driver) { throw new RugoException('Model type is not defined.'); }
-
-    const [nextSchema, extSchema] = parseSchema(schema);
 
     args.name = name;
     args.driver = driver;
-    args.acls = schema._acls || [];
-    args.schema = nextSchema;
-    args.extSchema = extSchema;
-    args.nextCall = (nextAddress, nextArgs) => this.call(nextAddress, { ...nextArgs, schema: nextSchema });
+    args.acls = schema.acls || [];
   },
   ...actionHooks
 };

@@ -36,26 +36,29 @@ It does not have any settings.
 
 ### Schema
 
-Using schema as driver but it has some additions:
+We have some additions root attribute in schema.
 
-- `_driver`: Driver name, choose driver to handle deeper action.
-- `_acls`: Access controls list, which item is the action name. It's public by default, but when `args` contains `acl=true`, it will prevent user to do the model action.
+- `driver`: Driver name, choose driver to handle deeper action.
+- `acls`: Access controls list, which item is the action name. It's public by default, but when `args` contains `acl=true`, it will prevent user to do the model action.
 
 We have some extended types:
 
 **`relation` -> `string`**
 
-- `ref` reference model name.
+- `to` Reference model name.
 
 **`file` -> `string`**
 
-- `ref` Reference model name.
-- `prefix` Value must have this at head, and ignore a head part of value for validation.
+- `to` Reference model name.
 - `mimes` Allowed mime list.
 
 **`rich` -> `string`**
 
 - `image` a `file` schema for image selection.
+
+### Extend Keywords
+
+- `default` Handle functional default with `$` as prefix.
 
 ### Response
 
@@ -185,20 +188,6 @@ Return:
 - **`{doc} data`** removed doc.
 
 <br />
-
-**New actions**
-
-### `register`
-
-Register schema to later use.
-
-Arguments: 
-
-- `{object} schema` Schema to registered.
-
-Return:
-
-- `{boolean}` always `true` if success.
 
 ## License
 

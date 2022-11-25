@@ -25,6 +25,8 @@
     "mocha": "^10.0.0"
   },
   "dependencies": {
+    "@rugo-vn/exception": "../exception",
+    "@rugo-vn/schema": "../schema",
     "@rugo-vn/service": "../service",
     "mime": "^3.0.0",
     "ramda": "^0.28.0"

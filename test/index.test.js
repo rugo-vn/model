@@ -2,13 +2,13 @@
 
 import { createBroker } from '@rugo-vn/service';
 import { assert, expect } from 'chai';
-import { AclError, NotFoundError } from '../src/exceptions.js';
+import { AclError, NotFoundError } from '@rugo-vn/exception';
 
 
 const schema = {
-  _name: 'cat',
-  _driver: 'sample',
-  _acls: ['get'],
+  name: 'cat',
+  driver: 'sample',
+  acls: ['get'],
   title: 'Cat',
   description: 'Something fun about cat profile',
   type: 'object',
@@ -19,13 +19,13 @@ const schema = {
     male: { type: 'boolean', default: true },
     hobbies: { type: 'array', uniqueItems: true, maxItems: 3, items: { type: 'string' } },
     contact: { type: 'object', properties: { email: { type: 'string', format: 'email' }, phone: { type: 'string' }, address: {}, mother: { type: 'relation', name: 'cat' }  } },
-    father: { type: 'relation', name: 'cat' },
+    father: { type: 'relation', to: 'cat' },
     parent: { type: 'array', items: { type: 'relation' }},
   },
   required: ['name', 'age'],
   additionalProperties: false
 };
-const schemaName = schema._name;
+const schemaName = schema.name;
 
 describe('model test', () => {
   let broker;
@@ -129,7 +129,7 @@ describe('model test', () => {
     }, name: schemaName });
     
     expect(resp.data).to.has.property('data');
-    expect(resp.data).to.has.property('schema');
+    expect(resp.data).to.has.property('name');
   });
 
   it('should update', async () => {
