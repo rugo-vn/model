@@ -4,7 +4,7 @@ import { ModelResp } from './utils.js';
 
 const defaultAction = action => {
   const fn = async function ({ driver: driverName, ...args }) {
-    if (args.id) {
+    if (args.id !== undefined) {
       args.query ||= {};
       args.query._id = args.id;
     }
@@ -80,8 +80,6 @@ export const find = async function ({ driver: driverName, name, query, limit, so
 
 export const count = defaultAction('count');
 export const create = defaultAction('create');
-
-console.log(count, create);
 
 export const get = async function ({ driver: driverName, id, name }) {
   const doc = (await this.call(`driver.${driverName}.find`, { name, query: { _id: id } }))[0];

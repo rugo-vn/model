@@ -174,4 +174,9 @@ describe('model test', () => {
       expect(errs[0] instanceof AclError).to.be.eq(true);
     }
   });
+
+  it('should some extend action', async () => {
+    const resp = await broker.call('model.extract', { id: 0, name: schemaName });
+    expect(resp.data.query).to.has.property('_id', 0);
+  });
 });
